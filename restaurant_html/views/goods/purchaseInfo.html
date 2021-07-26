@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <script src="../../static/js/vue.min.js"></script>
+    <script src="../../static/js/axios.min.js"></script>
+    <script src="../../static/eui/index.js"></script>
+    <link rel="stylesheet" href="../../static/eui/element-ui.css">
+    <script src="../../static/js/App.js"></script>
+    <script src="../../static/js/auth.js"></script>
+    <script src="../../static/js/checkIsLogin.js"></script>
+    <script src="../../static/js/RefreshComponent.js"></script>
+
+</head>
+
+<body>
+    <div id="app">
+        <div class="goods-container">
+            <!-- 编辑进货弹出框 -->
+            <el-dialog width="50%" append-to-body title="编辑商品进货" :visible.sync="goodsInfoDialog">
+                <el-form size="mini" :rules="goodsInfoRules" ref="goods-info-form" :model="goodsInfo" :label-position="position" label-width="80px">
+                    <el-form-item label-width="22%" prop="supplierName" label="供应商名称">
+                        <el-input v-model="goodsInfo.supplierName" placeholder="请输入内容"></el-input>
+                    </el-form-item>
+                    <el-form-item label-width="22%" prop="goodsName" label="商品名称" label="活动区域">
+                        <el-input v-model="goodsInfo.goodsName" placeholder="请输入内容"></el-input>
+                    </el-form-item>
+                    <el-form-item label-width="22%" prop="quantity" label="进货数量">
+                        <el-input v-model="goodsInfo.quantity" placeholder="进货数量带单位"></el-input>
+                    </el-form-item>
+                    <el-form-item label-width="22%" prop="totalPrice" label="进货价格(元)">
+                        <el-input v-model="goodsInfo.totalPrice" placeholder="请输入数字"></el-input>
+                    </el-form-item>
+                    <el-form-item label-width="22%" prop="payType" label="支付类型">
+                        <el-radio-group v-model="goodsInfo.payType">
+                            <el-radio :label="0">微信</el-radio>
+                            <el-radio :label="1">支付宝</el-radio>
+                            <el-radio :label="2">银联</el-radio>
+                        </el-radio-group>
+                    </el-form-item>
+                    <el-form-item label-width="22%" prop="remark" label="进货备注">
+                        <el-input type="textarea" placeholder="请输入内容" v-model="goodsInfo.remark" show-word-limit class="remark-textarea" :rows="4">
+                        </el-input>
+                    </el-form-item>
+                </el-form>
+                <div slot="footer" class="dialog-footer">
+                    <el-button size="mini" type="primary" @click="saveOrEdit">确 定</el-button>
+                </div>
+            </el-dialog>
+            <!-- 编辑进货弹出框结束 -->
+            <el-card class="filter-card">
+
+                <!-- 数据筛选表单 -->
+                <el-form :model="bindSearchMap" :inline="true" size="mini">
+                    <el-form-item label="供应商名称">
+                        <el-input v-model="bindSearchMap.supplierName" placeholder="请输入供应商名称"></el-input>
+                    </el-form-item>
+                    <el-form-item label="商品名称">
+                        <el-input v-model="bindSearchMap.goodsName" placeholder="请输入商品名称"></el-input>
+                    </el-form-item>
+                    <el-form-item label="进货日期">
+                        <el-date-picker v-model="bindSearchMap.purchaseTime" align="right" type="date" placeholder="选择日期" value-format="yyyy-MM-dd"
+                            :picker-options="pickerOptions">
+                        </el-date-picker>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button icon="el-icon-search" type="success" @click="search">查询</el-button>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button icon="el-icon-refresh-right" type="warning" @click="reset">重置</el-button>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button size="mini" type="primary" icon="el-icon-plus" @click="addGoodsInfo">商品进货</el-button>
+                    </el-form-item>
+                </el-form>
+                <!-- /数据筛选表单 -->
+                <!-- 进货信息列表 -->
+                <el-table v-loading="loading" :data="goodsInfoList" style="width: 100%">
+                    <el-table-column type="expand">
+                        <template slot-scope="props">
+                            <el-form label-position="left" inline class="demo-table-expand">
+                                <el-form-item label="备注">
+                                    <span>{{ props.row.remark }}</span>
+                                </el-form-item>
+                                <el-form-item label="支付类型">
+                                    <span>{{ props.row.payType }}</span>
+                                </el-form-item>
+                                <el-form-item label="进货数量">
+                                    <span>{{ props.row.quantity }}斤</span>
+                                </el-form-item>
+                                <el-form-item label="总价">
+                                    <span>{{ props.row.totalPrice }} 元</span>
+                                </el-form-item>
+                            </el-form>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="进货日期" prop="purchaseTime">
+                    </el-table-column>
+                    <el-table-column label="供应商名称" prop="supplierName">
+                    </el-table-column>
+                    <el-table-column label="商品名称" prop="goodsName">
+                    </el-table-column>
+                    <el-table-column label="操作">
+                        <template slot-scope="scope">
+                            <el-button size="mini" @click="findById(scope.row.id)">编辑</el-button>
+                            <el-button size="mini" type="danger" @click="deleteById(scope.row.id)">删除</el-button>
+                            <el-button size="mini" type="warning" @click="returned(scope.row.id)">退货</el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+                <!-- 进货信息列表结束 -->
+                <!-- 列表分页 -->
+                <el-pagination layout="total, sizes, prev, pager, next, jumper" background :total="totalCount" :page-size="pageSize" :current-page.sync="currentPage"
+                    :page-sizes="[5, 10]" @current-change="onCurrentChange" @size-change="handleSizeChange" />
+                <!-- /列表分页 -->
+            </el-card>
+        </div>
+</body>
+
+<script>
+
+    var Main = {
+        data() {
+            return {
+                position: 'right',
+                supplierId: null,
+                goodsId: null,
+                id: null,
+                payType: ['微信', '支付宝', '银联'],
+                totalCount: 0,
+                pageSize: 10,
+                loading: true,
+                currentPage: 1,
+                goodsInfoList: [],
+                goodsInfoDialog: false,
+                goodsInfo: { supplierName: '', goodsName: '' },
+                bindSearchMap: {},
+                reqSearchMap: {},
+                pickerOptions: {
+                    disabledDate(time) {
+                        return time.getTime() > Date.now()
+                    },
+                    shortcuts: [{
+                        text: '今天',
+                        onClick(picker) {
+                            picker.$emit('pick', new Date())
+                        }
+                    }, {
+                        text: '昨天',
+                        onClick(picker) {
+                            const date = new Date()
+                            date.setTime(date.getTime() - 3600 * 1000 * 24)
+                            picker.$emit('pick', date)
+                        }
+                    }, {
+                        text: '一周前',
+                        onClick(picker) {
+                            const date = new Date()
+                            date.setTime(date.getTime() - 3600 * 1000 * 24 * 7)
+                            picker.$emit('pick', date)
+                        }
+                    }]
+                },
+                goodsInfoRules: {
+                    supplierName: [
+                        { required: true, message: '请选择供应商名称', trigger: 'blur' }
+                    ],
+                    goodsName: [
+                        { required: true, message: '请选择商品名称', trigger: 'blur' }
+                    ],
+                    quantity: [
+                        { required: true, message: '进货数量不能为空', trigger: 'blur' },
+                        { pattern: /^\d{1,9999}$/, message: '请输入正确的格式', trigger: 'blur' }
+                    ],
+                    totalPrice: [
+                        { required: true, message: '进货价格不能为空', trigger: 'blur' },
+                        { pattern: /^\d{1,9999}$/, message: '请输入正确的格式', trigger: 'blur' }
+                    ],
+                    payType: [
+                        { required: true, message: '请选择支付类型', trigger: 'change' }
+                    ],
+                    remark: [
+                        { required: true, message: '请填写进货备注', trigger: 'blur' }
+                    ]
+                }
+            }
+        },
+
+        created: function () {
+            this.getGoodsInfoList()
+        },
+
+        methods: {
+
+            onCurrentChange() {
+                this.getGoodsInfoList()
+            },
+
+            // 每页显示条数改变时
+            handleSizeChange(val) {
+                this.pageSize = val
+                this.currentPage = 1
+                this.getGoodsInfoList()
+            },
+
+            // 添加进货弹出框
+            addGoodsInfo() {
+                this.goodsInfo = { payType: 0 }
+                this.goodsInfoDialog = true
+            },
+
+            // 重置编辑商品对话框
+            resetDialog() {
+                this.$refs['goods-info-form'].resetFields()
+            },
+
+            save() {
+                axios.post(global_api_url + 'goodsInfo/save', this.goodsInfo).then(res => {
+                    if (res.data.code == 0) {
+                        this.$message.success(res.data.msg)
+                        this.goodsInfoDialog = false
+                        this.id = null
+                        this.goodsInfo = { supplierId: '', goodsId: '' }
+                        this.resetDialog()
+                        this.getGoodsInfoList()
+                    } else {
+                        this.$message.error("错误消息：" + res.data.msg)
+                        this.goodsInfoDialog = false
+                    }
+                })
+            },
+            edit() {
+                axios.put(global_api_url + `goodsInfo/update/${this.id}`, this.goodsInfo).then(res => {
+                    if (res.data.code == 0) {
+                        this.$message.success(res.data.msg)
+                        this.goodsInfoDialog = false
+                        this.id = null
+                        this.goodsInfo = { supplierId: '', goodsId: '' }
+                        this.resetDialog()
+                        this.getGoodsInfoList()
+                    } else {
+                        this.$message.error("错误消息：" + res.data.msg)
+                        this.goodsInfoDialog = false
+                    }
+                })
+            },
+            // 添加或编辑进货信息
+            saveOrEdit() {
+                this.$refs['goods-info-form'].validate(valid => {
+                    if (!valid) {
+                        return
+                    }
+                    // 转换为字符串
+                    this.goodsInfo.payType = this.payType[this.goodsInfo.payType]
+                    if (this.id === undefined || this.id === null || this.id === '') {
+                        this.save()
+                    } else {
+                        this.edit()
+                    }
+                })
+            },
+
+            // 查询某个订货信息
+            findById(id) {
+                axios.get(global_api_url + `goodsInfo/findById/${id}`).then(res => {
+                    if (res.data.code == 0) {
+                        this.goodsInfo = res.data.data
+                        if (this.goodsInfo.payType === '微信') {
+                            this.goodsInfo.payType = 0
+                        } else if (this.goodsInfo.payType === '支付宝') {
+                            this.goodsInfo.payType = 1
+                        } else {
+                            this.goodsInfo.payType = 2
+                        }
+                        // 3.通过参数显示弹出层
+                        this.goodsInfoDialog = true
+                        this.id = id
+                    } else {
+                        this.$message.error("错误消息：" + res.data.msg)
+                    }
+                }).catch(e => {
+                    alert(e)
+                })
+            },
+
+            // 根据id删除
+            deleteById(id) {
+                this.$confirm('确认删除吗？', '删除提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    axios.delete(global_api_url + `goodsInfo/deleteById/${id}`).then(res => {
+                        if (res.data.code == 0) {
+                            this.$message.success(res.data.msg)
+                            this.getGoodsInfoList()
+                        } else {
+                            this.$message.error("错误消息：" + res.data.msg)
+                        }
+                    }).catch(e => {
+                        alert(e)
+                    })
+                }).catch(() => {
+                    this.$message({
+                        type: 'info',
+                        message: '已取消删除'
+                    })
+                })
+            },
+
+            // 退货
+            returned(id) {
+                this.$confirm('确认要退货吗？', '退货提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    axios.put(global_api_url + `goodsInfo/returnGoods/${id}`).then(res => {
+                        if (res.data.code == 0) {
+                            this.$message.success(res.data.msg)
+                            this.getGoodsInfoList()
+                        } else {
+                            this.$message.error("错误消息：" + res.data.msg)
+                        }
+                    }).catch(e => {
+                        alert(e)
+                    })
+                }).catch(() => {
+                    this.$message.info('已取消退货')
+                })
+            },
+
+            // 获取进货信息列表
+            getGoodsInfoList() {
+                this.loading = true
+                axios.post(global_api_url + `goodsInfo/getGoodsInfoList/${this.currentPage}/${this.pageSize}`, this.reqSearchMap).then(res => {
+                    if (res.data.code == 0) {
+                        const { rows, total: totalCount } = res.data.data
+                        this.goodsInfoList = rows
+                        this.totalCount = totalCount
+                        this.loading = false
+                    } else {
+                    this.$alert(res.data.msg, '提示', {
+                    confirmButtonText: '确定',
+                    type: 'wrong',
+                    callback: action => {
+                        parent.app.removeTab("viewsgoodspurchaseInfo.html_进货信息")
+                    }
+                });
+            }
+        })
+            },
+
+            // 条件查询
+            search() {
+                // 判空处理
+                for (const key in this.bindSearchMap) {
+                    if (this.bindSearchMap[key] !== '' && this.bindSearchMap[key] !== null && this.bindSearchMap[key] !== undefined) {
+                        this.currentPage = 1
+                        this.reqSearchMap = this.bindSearchMap
+                        this.getGoodsInfoList()
+                        return
+                    }
+                }
+                this.$message.error('请输入至少一个查询条件')
+            },
+
+            // 条件重置
+            reset() {
+                this.bindSearchMap = {}
+                this.reqSearchMap = {}
+                this.currentPage = 1
+                this.getGoodsInfoList()
+            }
+        }
+    }
+    let Ctor = Vue.extend(Main);
+    let app = new Ctor().$mount('#app');
+
+    /**
+     *  回车搜索
+     * @param e
+     */
+    document.onkeydown = function (e) {
+        var theEvent = window.event || e;
+        var code = theEvent.keyCode || theEvent.which || theEvent.charCode;
+        if (code == 13) {
+            //搜索
+            app.searchData('ruleForm');
+        }
+    }
+</script>
+
+</html>
+<style>
+    .action-head {
+        padding-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .remark-textarea {
+        color: red;
+        width: 480px;
+    }
+
+    .demo-table-expand {
+        font-size: 0;
+    }
+
+    .demo-table-expand label {
+        width: 90px;
+        color: #99a9bf;
+    }
+
+    .demo-table-expand .el-form-item {
+        margin-right: 0;
+        margin-bottom: 0;
+        width: 50%;
+    }
+</style>

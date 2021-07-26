@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+
+    <script src="../../static/js/vue.min.js"></script>
+    <script src="../../static/js/axios.min.js"></script>
+    <script src="../../static/eui/index.js"></script>
+    <link rel="stylesheet" href="../../static/eui/element-ui.css">
+    <link rel="stylesheet" href="../../static/css/index.css">
+    <script src="../../static/js/App.js"></script>
+    <script src="../../static/js/auth.js"></script>
+    <script src="../../static/js/checkIsLogin.js"></script>
+    <script src="../../static/js/RefreshComponent.js"></script>
+
+</head>
+
+<body>
+    <div id="app">
+        <div class="order-container">
+
+            <el-card class="box-card">
+                <div slot="header" class="clearfix">
+                    订餐管理：
+                </div>
+                <!-- 数据列表 -->
+                <el-table :data="orderList" stripe style="width: 100%" class="list-table" size="mini" v-loading="loading">
+                    <el-table-column label="位置">
+                        <template slot-scope="scope">
+                            <el-button type="primary" size="mini" round>{{scope.row.tableNumber}}</el-button>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="orderId" label="订单号"></el-table-column>
+                    <el-table-column prop="orderAmount" label="金额">
+                        <template slot-scope="scope">
+                            {{scope.row.orderAmount}}元
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="订单状态">
+                        <template slot-scope="scope">
+                            <el-tag>{{ orderStatus[scope.row.orderStatus].text }}</el-tag>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="支付状态">
+                        <template slot-scope="scope">
+                            <el-tag>{{ payStatus[scope.row.payStatus].text }}</el-tag>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="createTime" label="创建时间"></el-table-column>
+                    <el-table-column label="操作" width="180">
+                        <template slot-scope="scope">
+                            <el-button size="mini" round icon="el-icon-milk-tea" type="primary" @click="findOrderDetail(scope.row.orderId)">详情</el-button>
+                            <el-button v-if="scope.row.orderStatus !== 2 && scope.row.orderStatus !== 1" size="mini" type="info" icon="el-icon-pear"
+                                round @click="cancelPageOrder(scope.row.orderId)">取消</el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+                <!-- /数据列表 -->
+
+                <!-- 列表分页 -->
+                <el-pagination layout="total, sizes, prev, pager, next, jumper" background :total="totalCount" :page-size="pageSize" :disabled="loading"
+                    :current-page.sync="page" :page-sizes="[5, 10]" @current-change="onCurrentChange" @size-change="handleSizeChange"
+                />
+                <!-- /列表分页 -->
+
+
+            </el-card>
+            <!-- 订单详情弹出框 -->
+            <el-dialog title="订单详情" :visible.sync="dialogFormVisible" :append-to-body="true">
+                <!-- 订单主号列表 -->
+                <el-table :data="orderMaster" stripe style="width: 100%" class="list-table" size="mini" v-loading="loading">
+                    <el-table-column prop="orderNumber" label="订单号"></el-table-column>
+                    <el-table-column prop="orderAmount" label="订单总金额">
+                        <template slot-scope="scope">
+                            {{scope.row.orderAmount}}元
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="订单状态">
+                        <template slot-scope="scope">
+                            <el-tag>{{ orderStatus[scope.row.orderStatus].text }}</el-tag>
+                        </template>
+                    </el-table-column>
+                </el-table>
+                <!-- /订单号列表 -->
+
+                <!-- 订单详情列表 -->
+                <el-table :data="orderDetailList" stripe style="width: 100%" class="list-table" size="mini" v-loading="loading">
+                    <el-table-column prop="menuId" label="菜单项id"></el-table-column>
+                    <el-table-column prop="menuName" label="菜单项名称"></el-table-column>
+                    <el-table-column prop="menuPrice" label="价格">
+                        <template slot-scope="scope">
+                            {{scope.row.menuPrice}}元
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="menuQuantity" label="数量"></el-table-column>
+                    <el-table-column label="总额">
+                        <template slot-scope="scope">
+                            {{scope.row.menuPrice*scope.row.menuQuantity}}
+                        </template>
+                    </el-table-column>
+                </el-table>
+                <!-- /订单详情列表 -->
+                <div slot="footer" class="dialog-footer detail-btn">
+                    <el-button v-if="orderMaster[0].orderStatus !== 2 && orderMaster[0].orderStatus !== 1" type="danger" @click="finish" size="mini">完结订单</el-button>
+                    <el-button v-if="orderMaster[0].orderStatus !== 2 && orderMaster[0].orderStatus !== 1" type="warning" @click="cancelDetailOrder"
+                        size="mini">取消订单</el-button>
+                </div>
+            </el-dialog>
+            <!-- 订单详情弹出框结束 -->
+        </div>
+        <audio id="notice">
+            <source src="./order.mp3" type="audio/mpeg" />
+        </audio>
+</body>
+
+<script>
+
+    var Main = {
+        data() {
+            const Authorization = JSON.parse(window.sessionStorage.getItem('Authorization'))
+            return {
+                Authorization: Authorization,
+                orderMaster: [{ orderStatus: 0 }],
+                orderDetailList: [],
+                dialogFormVisible: false,
+                order: {},
+                id: null,
+                orderId: null,
+                form: {},
+                orderList: [], // 订单数据列表
+                orderStatus: [
+                    { text: '新下单' }, // 0
+                    { text: '已完结' }, // 1
+                    { text: '已取消' } // 2
+                ],
+                payStatus: [
+                    { text: '未支付' }, // 0
+                    { text: '已支付' } // 1
+                ],
+                totalCount: 0, // 总数据条数
+                pageSize: 10, // 每页大小
+                loading: true, // 表单数据加载中 loading
+                page: 1, // 当前页码
+            }
+        },
+        created: function () {
+            this.openWebSocket()
+            this.findByPage()
+        },
+
+        methods: {
+            // 打开websocket
+            openWebSocket() {
+                var websocket = null;
+                var this_ = this;
+                if ('WebSocket' in window) {
+                    websocket = new WebSocket('ws://s1.nsloop.com:31729/customerService/webSocket');
+                } else {
+                    alert('该浏览器不支持websocket!');
+                }
+
+                websocket.onopen = function (event) {
+                    console.log('建立连接');
+                }
+
+                websocket.onclose = function (event) {
+                    console.log('连接关闭');
+                }
+
+                websocket.onmessage = function (event) {
+                    console.log('收到消息:' + event.data)
+                    //弹窗提醒, 播放音乐
+                    if (JSON.parse(window.sessionStorage.getItem('Authorization')).auth[0].authority.slice(5) === '店长') {
+                        document.getElementById('notice').play();
+                        this_.$notify({
+                            title: '提示',
+                            message: '您有新的订单，请几时处理',
+                            duration: 4500
+                        });
+                        this_.findByPage()
+                    }
+                }
+
+                websocket.onerror = function () {
+                    alert('websocket通信发生错误！');
+                }
+
+                window.onbeforeunload = function () {
+                    websocket.close();
+                }
+
+            },
+
+            // 取消列表页订单
+            cancelPageOrder(orderId) {
+                this.$confirm('确认要取消吗？', '取消提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    axios.put(global_api_url + `orderMaster/cancel/${orderId}`).then(res => {
+                        if (res.data.code == 0) {
+                            this.dialogFormVisible = false
+                            this.$message.success(res.data.msg)
+                            this.findByPage()
+                        } else {
+                            this.$message.error("错误消息：" + res.data.msg)
+                        }
+                    }).catch(e => {
+                        alert(e)
+                    })
+                })
+            },
+
+            // 取消详情页订单
+            cancelDetailOrder() {
+
+                axios.put(global_api_url + `orderMaster/cancel/${this.orderId}`).then(res => {
+                    if (res.data.code == 0) {
+                        this.dialogFormVisible = false
+                        this.$message.success(res.data.msg)
+                        this.findByPage()
+                    } else {
+                        this.$message.error("错误消息：" + res.data.msg)
+                        this.dialogFormVisible = false
+                    }
+                }).catch(e => {
+                    alert(e)
+                })
+            },
+
+            // 完结订单
+            finish() {
+                axios.put(global_api_url + `orderMaster/finish/${this.orderId}`).then(res => {
+                    if (res.data.code == 0) {
+                        this.dialogFormVisible = false
+                        this.$message.success(res.data.msg)
+                        this.findByPage()
+                    } else {
+                        this.$message.error("错误消息：" + res.data.msg)
+                        this.dialogFormVisible = false
+                    }
+                }).catch(e => {
+                    alert(e)
+                })
+            },
+
+            // 根据订单id查询订单详情
+            findOrderDetail(orderId) {
+
+                axios.get(global_api_url + `orderMaster/detail/${orderId}`).then(res => {
+                    if (res.data.code == 0) {
+                        // 绑定到order对象
+                        this.orderMaster = JSON.parse('[' + JSON.stringify(res.data.data) + ']')
+                        this.orderDetailList = res.data.data.orderDetailList
+                        this.dialogFormVisible = true
+                        this.orderId = orderId
+                    } else {
+                        this.$message.error("错误消息：" + res.data.msg)
+                    }
+                }).catch(e => {
+                    alert(e)
+                })
+            },
+
+            // 加载订单列表
+            findByPage() {
+                this.loading = true
+                axios.post(global_api_url + `orderMaster/findByPage/${this.page}/${this.pageSize}`).then(res => {
+                    if (res.data.code == 0) {
+                        // 绑定到order对象
+                        const { rows, total: totalCount } = res.data.data
+                        this.orderList = rows
+                        console.log(this.orderList)
+                        this.totalCount = totalCount
+                        this.loading = false
+                    } else {
+                        this.$alert(res.data.msg, '提示', {
+                            confirmButtonText: '确定',
+                            type: 'wrong',
+                            callback: action => {
+                                parent.app.removeTab("viewsorderindex.html_订餐管理")
+                            }
+                        });
+                    }
+                }).catch(e => {
+                    alert(e)
+                })
+            },
+
+            // 每页显示条数改变时
+            handleSizeChange(val) {
+                this.pageSize = val
+                this.page = 1
+                this.onCurrentChange()
+            },
+
+            // 当前页改变时重新加载员工列表
+            onCurrentChange(page) {
+                this.findByPage()
+            },
+
+        }
+    }
+    let Ctor = Vue.extend(Main);
+    let app = new Ctor().$mount('#app');
+
+
+</script>
+
+</html>

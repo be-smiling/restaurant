@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+
+    <script src="../../static/js/vue.min.js"></script>
+    <script src="../../static/js/axios.min.js"></script>
+    <script src="../../static/eui/index.js"></script>
+    <link rel="stylesheet" href="../../static/eui/element-ui.css">
+    <link rel="stylesheet" href="../../static/css/index.css">
+    <script src="../../static/js/App.js"></script>
+    <script src="../../static/js/auth.js"></script>
+    <script src="../../static/js/checkIsLogin.js"></script>
+
+</head>
+
+<body>
+    <div id="app">
+        <div class="goods-container">
+            <el-card class="filter-card">
+                <div slot="header" class="clearfix">
+                </div>
+                <!-- 进货信息列表 -->
+                <el-table v-loading="loading" :data="goodsInfoList" style="width: 100%">
+                    <el-table-column type="expand">
+                        <template slot-scope="props">
+                            <el-form label-position="left" inline class="demo-table-expand">
+                                <el-form-item label="备注">
+                                    <span>{{ props.row.remark }}</span>
+                                </el-form-item>
+                                <el-form-item label="支付类型">
+                                    <span>{{ props.row.payType }}</span>
+                                </el-form-item>
+                                <el-form-item label="进货数量">
+                                    <span>{{ props.row.quantity }}斤</span>
+                                </el-form-item>
+                                <el-form-item label="总价">
+                                    <span>{{ props.row.totalPrice }} 元</span>
+                                </el-form-item>
+                            </el-form>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="进货日期" prop="purchaseTime">
+                    </el-table-column>
+                    <el-table-column label="供应商名称" prop="supplierName">
+                    </el-table-column>
+                    <el-table-column label="商品名称" prop="goodsName">
+                    </el-table-column>
+                    <el-table-column label="操作">
+                        <template slot-scope="scope">
+                            <el-button size="mini" type="danger" @click="deleteById(scope.row.id)">删除</el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+                <!-- 进货信息列表结束 -->
+                <!-- 列表分页 -->
+                <el-pagination layout="total, sizes, prev, pager, next, jumper" background :total="totalCount" :page-size="pageSize" :current-page.sync="currentPage"
+                    :page-sizes="[5, 10]" @current-change="onCurrentChange" @size-change="handleSizeChange"></el-pagination>
+                <!-- /列表分页 -->
+            </el-card>
+        </div>
+</body>
+
+<script>
+
+    var Main = {
+        data() {
+            return {
+                id: null,
+                totalCount: 0,
+                pageSize: 10,
+                loading: true,
+                currentPage: 1,
+                goodsInfoList: [],
+            }
+        },
+
+        created: function () {
+            this.getGoodsInfoList()
+        },
+
+        methods: {
+
+            onCurrentChange() {
+                this.getGoodsInfoList()
+            },
+
+            // 每页显示条数改变时
+            handleSizeChange(val) {
+                this.pageSize = val
+                this.currentPage = 1
+                this.getGoodsInfoList()
+            },
+
+            // 根据id删除
+            deleteById(id) {
+                this.$confirm('确认删除吗？', '删除提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    axios.delete(global_api_url + `goodsInfo/deleteById/${id}`).then(res => {
+                        if (res.data.code == 0) {
+                            this.$message.success(res.data.msg)
+                            this.getGoodsInfoList()
+                        } else {
+                            this.$message.error("错误消息：" + res.data.msg)
+                        }
+                    }).catch(e => {
+                        alert(e)
+                    })
+                }).catch(() => {
+                    this.$message({
+                        type: 'info',
+                        message: '已取消删除'
+                    })
+                })
+            },
+
+            // 获取退货信息列表
+            getGoodsInfoList() {
+                this.loading = true
+                axios.get(global_api_url + 'goodsInfo/getReturnedList').then(res => {
+                    if (res.data.code == 0) {
+                        const { rows, total: totalCount } = res.data.data
+                        this.goodsInfoList = res.data.data
+                        this.totalCount = totalCount
+                        this.loading = false
+                    } else {
+                        this.$alert(res.data.msg, '提示', {
+                            confirmButtonText: '确定',
+                            type: 'wrong',
+                            callback: action => {
+                                parent.app.removeTab("viewsgoodsrefundInfo.html_退货信息")
+                            }
+                        });
+                    }
+                }).catch(e => {
+                    alert(e)
+                })
+            },
+
+        }
+    }
+    let Ctor = Vue.extend(Main);
+    let app = new Ctor().$mount('#app');
+
+    /**
+     *  回车搜索
+     * @param e
+     */
+    document.onkeydown = function (e) {
+        var theEvent = window.event || e;
+        var code = theEvent.keyCode || theEvent.which || theEvent.charCode;
+        if (code == 13) {
+            //搜索
+            app.searchData('ruleForm');
+        }
+    }
+</script>
+
+</html>
+<style>
+    .action-head {
+        padding-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .remark-textarea {
+        color: red;
+        width: 480px;
+    }
+
+    .demo-table-expand {
+        font-size: 0;
+    }
+
+    .demo-table-expand label {
+        width: 90px;
+        color: #99a9bf;
+    }
+
+    .demo-table-expand .el-form-item {
+        margin-right: 0;
+        margin-bottom: 0;
+        width: 50%;
+    }
+</style>

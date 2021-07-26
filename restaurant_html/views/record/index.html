@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+
+    <script src="../../static/js/vue.min.js"></script>
+    <script src="../../static/js/axios.min.js"></script>
+    <script src="../../static/eui/index.js"></script>
+    <script src="../../static/printjs/print.min.js"></script>
+    <link rel="stylesheet" href="../../static/eui/element-ui.css">
+    <link rel="stylesheet" href="../../static/css/index.css">
+    <script src="../../static/js/App.js"></script>
+    <script src="../../static/js/auth.js"></script>
+    <script src="../../static/js/checkIsLogin.js"></script>
+    <script src="../../static/js/RefreshComponent.js"></script>
+
+</head>
+
+<body>
+    <div id="app">
+        <div class="consumption-container">
+
+            <el-card class="box-card">
+                <!-- 数据列表 -->
+                <el-table :data="orderList" stripe style="width: 100%" class="list-table" size="mini" v-loading="loading">
+                    <el-table-column prop="orderNumber" label="流水号"></el-table-column>
+                    <el-table-column prop="createTime" label="创建时间"></el-table-column>
+                    <el-table-column prop="orderAmount" label="总额"></el-table-column>
+                    <el-table-column label="订单状态">
+                        <template slot-scope="scope">
+                            <el-tag>{{ orderStatus[scope.row.orderStatus].text }}</el-tag>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="支付状态">
+                        <template slot-scope="scope">
+                            <el-tag>{{ payStatus[scope.row.payStatus].text }}</el-tag>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="180">
+                        <template slot-scope="scope">
+                            <el-button size="mini" round icon="el-icon-milk-tea" type="primary" @click="findOrderDetail(scope.row.orderId)">详情</el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+                <!-- /数据列表 -->
+
+                <!-- 列表分页 -->
+                <el-pagination layout="total, sizes, prev, pager, next, jumper" background :total="totalCount" :page-size="pageSize" :disabled="loading"
+                    :current-page.sync="page" :page-sizes="[5, 10]" @current-change="onCurrentChange" @size-change="handleSizeChange"></el-pagination>
+                <!-- /列表分页 -->
+
+                <!-- 消费记录详情弹出框 -->
+                <el-dialog width="20%" title="消费记录详情" :visible.sync="dialogFormVisible" :append-to-body="true">
+                    <div id="printDialog" class="print-dialog">
+                        <p>流水号：{{orderMaster[0].orderNumber}}</p>
+                        <p>创建时间：{{orderMaster[0].createTime}}</p>
+                        <p>-----------------------------</p>
+                        <div v-for="(item, index) in orderMaster[0].orderDetailList" :key="index">
+                            <p>菜单项名称：{{item.menuName}}</p>
+                            <p>菜单项价格：{{item.menuPrice}} 元</p>
+                            <p>菜单项数量：{{item.menuQuantity}}</p>
+                            <p>-----------------------------</p>
+                        </div>
+                        <p>总额：{{orderMaster[0].orderAmount}}</p>
+                    </div>
+                    <div slot="footer" class="dialog-footer detail-btn">
+                        <!-- <el-button icon="el-icon-printer" v-print="printConsumption" v-if="orderMaster[0].orderStatus !== 2" type="primary" size="mini">打印</el-button> -->
+                        <el-button @click="printRecord" icon="el-icon-printer" type="primary" size="mini">打印</el-button>
+                    </div>
+                </el-dialog>
+                <!-- 订单详情弹出框结束 -->
+            </el-card>
+        </div>
+</body>
+
+<script>
+
+    var Main = {
+        data() {
+            return {
+                printConsumption: {
+                    id: 'print-dialog',
+                    popTitle: '消费记录'
+                },
+                orderMaster: [{ orderStatus: 0 }],
+                orderDetailList: [],
+                dialogFormVisible: false,
+                order: {},
+                id: null,
+                orderId: null,
+                form: {},
+                orderList: [], // 订单数据列表
+                orderStatus: [
+                    { text: '新下单' }, // 0
+                    { text: '已完结' }, // 1
+                    { text: '已取消' } // 2
+                ],
+                payStatus: [
+                    { text: '未支付' }, // 0
+                    { text: '已支付' } // 1
+                ],
+                totalCount: 0, // 总数据条数
+                pageSize: 10, // 每页大小
+                loading: true, // 表单数据加载中 loading
+                page: 1, // 当前页码
+                searchMap: {}, // 条件查询对象
+                searchCondition: true
+            }
+        },
+
+        created: function () {
+            this.findByPage()
+        },
+
+        methods: {
+
+            // 打印消费记录
+            printRecord() {
+                printJS({
+                    // documentTitle: '<font size="20">消费记录详情</font>',
+                    // header: `<p class="custom-p"> 名单 </p>`,
+                    // font_size: '40px',
+                    // font: 'TimesNewRoman',
+                    style: '#printDialog {font-size: 20px;}',
+                    // headerStyle: 'font-weight: 300;',
+                    printable: 'printDialog',
+                    type: 'html',
+                    //properties: [
+                    //    { field: 'name', displayName: '姓名', columnSize:`50%`},
+                    //    { field: 'sex', displayName: '性别',columnSize:`50%`},
+                    //],
+                    // header: `<p class="custom-p"> 名单 </p>`,
+                    // style: '#printCons {width: 600px;} .no-print{width: 0px} .itemText1 { width: 200px } .itemText2 { width: 200px } .itemText3 { width: 200px } .itemText4 { width: 200px }',
+                    // gridHeaderStyle:'font-size:12px; padding:3px; border:1px solid; font-weight: 100; text-align:left;',
+                    // gridStyle:'font-size:12px; padding:3px; border:1px solid; text-align:left;',
+                    // repeatTableHeader: true,
+                    // scanStyles:true,
+                    targetStyles: ['*'],
+                    ignoreElements:['no-print','bc','gb']
+                })
+            },
+
+
+
+        // 根据订单id查询订单详情
+        findOrderDetail(orderId) {
+
+            axios.get(global_api_url + `orderMaster/detail/${orderId}`).then(res => {
+                if (res.data.code == 0) {
+                    this.orderMaster = JSON.parse('[' + JSON.stringify(res.data.data) + ']')
+                    this.orderDetailList = res.data.data.orderDetailList
+                    this.dialogFormVisible = true
+                    this.orderId = orderId
+                } else {
+                    this.$message.error("错误消息：" + res.data.msg)
+                }
+            }).catch(e => {
+                alert(e)
+            })
+        },
+
+        // 加载消费记录列表
+        findByPage() {
+            this.loading = true
+            axios.post(global_api_url + `orderMaster/record/${this.page}/${this.pageSize}`, this.searchMap).then(res => {
+                if (res.data.code == 0) {
+                    const { rows, total: totalCount } = res.data.data
+                    this.orderList = rows
+                    this.totalCount = totalCount
+                    this.loading = false
+                } else {
+                    this.$alert(res.data.msg, '提示', {
+                        confirmButtonText: '确定',
+                        type: 'wrong',
+                        callback: action => {
+                            parent.app.removeTab("viewsrecordindex.html_查看消费记录")
+                        }
+                    });
+                }
+            }).catch(e => {
+                alert(e)
+            })
+        },
+
+        // 每页显示条数改变时
+        handleSizeChange(val) {
+            this.pageSize = val
+            this.page = 1
+            this.onCurrentChange()
+        },
+
+        // 当前页改变时重新加载员工列表
+        onCurrentChange(page) {
+            this.findByPage()
+        },
+
+    }
+    }
+    let Ctor = Vue.extend(Main);
+    let app = new Ctor().$mount('#app');
+</script>
+
+</html>
+<style>
+    .detail-btn {
+        margin-top: -30px;
+        margin-right: 30px;
+    }
+
+    .search-input {
+        width: 245px;
+        display: inline-block;
+    }
+
+    .search-btn {
+        margin-left: 29px;
+    }
+
+    .filter-card {
+        margin-bottom: 30px;
+    }
+
+    .list-table {
+        margin-bottom: 20px;
+    }
+    .custom-p {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding:13px; 
+    }
+</style>

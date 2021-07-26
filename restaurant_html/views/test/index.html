@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+    <link rel="stylesheet" href="../../static/elementui/index.css">
+    <script src="../../static/elementui/jquery/jquery-3.1.1.min.js"></script>
+    <script src="../../static/js/vue.min.js"></script>
+    <script src="../../static/elementui/index.js"></script>
+    <script src="../../static/js/axios.min.js"></script>
+    <script src="../../static/js/App.js"></script>
+    <script src="../../static/js/auth.js"></script>
+    <script src="../../static/js/checkIsLogin.js"></script>
+    <script src="../../static/js/RefreshComponent.js"></script>
+
+    <style>
+        .radio-label {
+            font-size: 14px;
+            color: #606266;
+        }
+
+        .search-input {
+            width: 245px;
+            display: inline-block;
+        }
+
+        .search-btn {
+            margin-left: 29px;
+        }
+
+        .filter-card {
+            margin-bottom: 20px;
+        }
+
+        .list-table {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <el-form :label-position="labelPosition" label-width="80px" :model="formLabelAlign">
+            <el-form-item label="名称">
+                <el-input v-model="formLabelAlign.name"></el-input>
+            </el-form-item>
+            <el-form-item label="活动区域">
+                <el-input v-model="formLabelAlign.region"></el-input>
+            </el-form-item>
+            <el-form-item label="活动形式">
+                <el-input v-model="formLabelAlign.type"></el-input>
+            </el-form-item>
+        </el-form>
+</body>
+
+<script>
+
+    var vm = new Vue({
+        el: '#app',
+        data: function () {
+            return {
+                labelPosition: 'right',
+                formLabelAlign: {
+                    name: '',
+                    region: '',
+                    type: ''
+                }
+            }
+        },
+
+        created: function () {
+            // 加载员工列表
+            // this.loadEmployeeList(1)
+        },
+
+        mounted() {
+
+        },
+
+        methods: {
+
+            // 加载员工列表
+            loadEmployeeList(page = 1) {
+                this.loading = true
+                axios.post(global_api_url + `employee/findByPage/${this.page}/${this.pageSize}`, this.searchMap).then(res => {
+                    const { rows, total: totalCount } = res.data.data
+                    this.employeeList = rows
+                    this.totalCount = totalCount
+                    this.loading = false
+                })
+            },
+
+            /**
+             * 获取列表数据
+             */
+            getProductList: function () {
+                axios.post(global_api_url + "product/testPost", { id: 1, productName: "aaa" }).then(res => {
+                    console.log(res.data)
+                })
+            },
+
+            // 导出全部Excel
+            async exportAllExcel() {
+                this.exportLoading = true
+                const loadingInstance = Loading.service({
+                    text: '小主，请您稍等片刻，奴家正在玩命处理中...',
+                    background: 'rgba(0,0,0,.5)'
+                })
+                const res = await employeeApi.getAllEmployeeList()
+                this.exportEmployeeList = res.data.data
+                import('@/vendor/Export2Excel').then(excel => {
+                    const tHeader = ['姓名', '编号', '性别', '年龄', '角色', '电话', '月薪', '状态']
+                    const filterVal = ['name', 'number', 'sex', 'age', 'role', 'phone', 'salary', 'stay']
+                    const data = this.formatAllJson(filterVal, this.exportEmployeeList)
+                    excel.export_json_to_excel({
+                        header: tHeader,
+                        data,
+                        filename: `人员信息${new Date().getTime()}`,
+                        autoWidth: this.autoWidth,
+                        bookType: 'xlsx'
+                    })
+                })
+                loadingInstance.close()
+                this.exportLoading = false
+            },
+
+            // 导出员工列表
+            exportData() {
+                if (this.bookType === '全部xlsx') {
+                    this.exportAllExcel()
+                } else {
+                    this.exportExcel()
+                }
+            },
+
+            // 选中复选框时触发该方法
+            selectData(val) {
+                this.selectionList = val
+            },
+
+            // 格式化导出Excel的数据
+            formatAllJson(filterVal, jsonData) {
+                return jsonData.map(v => filterVal.map(j => {
+                    if (j === 'sex') {
+                        return this.employeeSex[v[j]].text
+                    }
+                    if (j === 'stay') {
+                        return this.employeeStatus[v[j]].text
+                    }
+                    return v[j]
+                }))
+            },
+
+            // 导出Excel
+            exportExcel() {
+                if (this.selectionList.length <= 0) {
+                    this.$message({
+                        message: '小主，请您先选择要导出的数据哦！',
+                        type: 'warning',
+                        showClose: true
+                    })
+                    return
+                }
+
+                this.exportLoading = true
+                const loadingInstance = Loading.service({
+                    text: '小主，请您稍等片刻，奴家正在玩命处理中...',
+                    background: 'rgba(0,0,0,.5)'
+                })
+                import('@/vendor/Export2Excel').then(excel => {
+                    const tHeader = ['姓名', '编号', '性别', '年龄', '角色', '电话', '月薪', '状态']
+                    const filterVal = ['name', 'number', 'sex', 'age', 'role', 'phone', 'salary', 'stay']
+                    const data = this.formatAllJson(filterVal, this.selectionList)
+                    excel.export_json_to_excel({
+                        header: tHeader,
+                        data,
+                        filename: `人员信息${new Date().getTime()}`,
+                        autoWidth: this.autoWidth,
+                        bookType: this.bookType
+                    })
+                })
+                loadingInstance.close()
+                this.exportLoading = false
+            },
+
+            // 导入Excel
+            async importExcel(e) {
+                const file = e.raw
+                if (!file) return
+                const suffix = file.name.substring(file.name.indexOf('.') + 1).toLowerCase()
+                if (suffix !== 'xlsx' && suffix !== 'xls') {
+                    return this.$message({
+                        message: '小主，请您选择 Excel格式的文件哦！',
+                        type: 'warning',
+                        showClose: true
+                    })
+                }
+
+                const loading = Loading.service({
+                    text: '小主，请您稍等片刻，奴家正在玩命处理中...',
+                    background: 'rgba(0,0,0,.5)'
+                })
+
+                await delay(100)
+
+                // 读取File中的数据
+                const data = await readFile(file)
+                const workbook = xlsx.read(data, { type: 'binary' })
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+                const list = xlsx.utils.sheet_to_json(worksheet)
+
+                // 把读取出来的数据变为可以提交为服务器的数据格式
+                const employeeArr = []
+                list.forEach(item => {
+                    var employee = {}
+                    for (const key in character) {
+                        if (!Object.prototype.hasOwnProperty.call(character, key)) break
+                        var v = character[key]
+                        const text = v.text
+                        const type = v.type
+                        if (text === '性别') {
+                            if (item[text] === '男') {
+                                v = 0
+                            } else if (item[text] === '女') {
+                                v = 1
+                            } else {
+                                v = null
+                            }
+                        } else if (text === '状态') {
+                            if (item[text] === '在职') {
+                                v = 0
+                            } else if (item[text] === '离职') {
+                                v = 1
+                            } else {
+                                v = null
+                            }
+                        } else {
+                            v = item[text] || null
+                        }
+                        if (type === 'string' && v !== null) {
+                            v = String(v)
+                        } else if (type === 'number' && v !== null && typeof (v) !== 'string') {
+                            v = Number(v)
+                        } else {
+                            v = null
+                        }
+                        employee[key] = v
+                    }
+                    employeeArr.push(employee)
+                })
+
+                await delay(100)
+
+                // 展示到页面中
+                this.showExcelDialog = true
+                this.employeeArr = employeeArr
+                loading.close()
+            },
+
+            // 提交数据给服务器
+            async submit() {
+                this.showExcelDialog = false
+                const loadingInstance = Loading.service({
+                    text: '小主，请您稍等片刻，奴家正在玩命处理中 ',
+                    background: 'rgba(0, 0, 0, .5)'
+                })
+
+                // 数据传递完成
+                const complete = () => {
+                    this.$message({
+                        message: '小主，奴家已经帮您吧数据都上传了！',
+                        type: 'success',
+                        showClose: true
+                    })
+                    // 重新查询数据列表
+                    this.loadEmployeeList(1)
+                    loadingInstance.close()
+                }
+
+                // 需要把数据一条条传递给服务器
+                let n = 0
+                const send = async () => {
+                    if (n > this.employeeArr.length - 1) {
+                        // 都发送完了
+                        complete()
+                        return
+                    }
+                    const employee = this.employeeArr[n]
+                    const res = await employeeApi.save(employee)
+                    if (res.data.flag) {
+                        n++
+                    }
+                    send()
+                }
+                send()
+            },
+
+            // 表头样式的方法
+            table_header(row, column, rowIndex, columnIndex) {
+                return 'background-color: #9370DB; color:white;font-size: 14px'
+            },
+
+            // 重置员工姓名输入框
+            resetForm() {
+                this.searchMap = {}
+                this.loadEmployeeList(1)
+            },
+
+            // 按条件查询员工
+            selectEmployeeList(page) {
+                if (this.searchMap.name === undefined || this.searchMap.name === '' || this.searchMap.name === null) {
+                    this.$message({
+                        message: '员工姓名不能为空',
+                        type: 'error'
+                    })
+                    return
+                }
+                this.loadEmployeeList(page)
+            },
+            // 员工录入
+            addEmployee() {
+                // 录入员工默认为男(0:男 1),角色为员工,状态为在职
+                this.employee = { sex: 0, role: '员工', stay: '0' }
+                this.dialogFormVisible = true
+            },
+            // 根据id查询员工
+            findById(id) {
+                axios.get(global_api_url + `employee/findById/${id}`).then(res => {
+                    // 2.绑定到employee对象
+                    this.employee = res.data.data
+                    // switch开关中的v-model中的值支持字符串式的数值
+                    this.employee.stay = res.data.data.stay + ''
+                    // 3.通过参数显示弹出层
+                    this.dialogFormVisible = true
+                    this.id = id
+                })
+            },
+
+            // 员工录入
+            save(employee) {
+                axios.post(global_api_url + 'employee/save', employee).then(res => {
+                    // 美化提示框
+                    this.$message({
+                        message: res.data.message,
+                        type: res.data.flag ? 'success' : 'error'
+                    })
+                    if (res.data.flag) {
+                        this.dialogFormVisible = false
+                        this.loadEmployeeList()
+                        this.id = null
+                    }
+                })
+            },
+            // 员工更新
+            update(id, employee) {
+                axios.put(global_api_url + `employee/update/${id}`, employee).then(res => {
+                    // 美化提示框
+                    this.$message({
+                        message: res.data.message,
+                        type: res.data.flag ? 'success' : 'error'
+                    })
+                    if (res.data.flag) {
+                        this.dialogFormVisible = false
+                        this.loadEmployeeList()
+                        this.id = null
+                    }
+                })
+            },
+            // 新增或更新员工
+            saveOrUpdate() {
+                this.$refs['dialog-form'].validate(valid => {
+                    if (!valid) {
+                        return
+                    }
+                    if (this.id === undefined || this.id === null || this.id === '') {
+                        this.save(this.employee)
+                    } else {
+                        this.update(this.id, this.employee)
+                    }
+                })
+            },
+
+            // 每页显示条数改变时
+            handleSizeChange(val) {
+                this.pageSize = val
+                this.page = 1
+                this.loadEmployeeList()
+            },
+
+            // 查询带分页且带条件时，从第一页开始查
+            searchWithPage: function () {
+                if (this.searchMap.name === '') {
+                    this.page = 1
+                }
+                if ((JSON.stringify(this.searchMap) !== '{}') && (this.searchCondition)) {
+                    this.page = 1
+                    this.searchCondition = false
+                }
+                this.loadEmployeeList()
+            },
+
+            // 删除员工
+            onDeleteEmployee(employeeId) {
+                this.$confirm('确认删除吗？', '删除提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    axios.delete(global_api_url + `employee/${employeeId}`).then(res => {
+                        this.$message({
+                            message: res.data.message,
+                            type: res.data.flag ? 'success' : 'error'
+                        })
+                        this.loadEmployeeList(this.page)
+                    })
+                }).catch(() => {
+                    this.$message({
+                        type: 'info',
+                        message: '已取消删除'
+                    })
+                })
+            }
+        }
+    })
+    /**
+     *  回车搜索
+     * @param e
+     */
+    document.onkeydown = function (e) {
+        var theEvent = window.event || e;
+        var code = theEvent.keyCode || theEvent.which || theEvent.charCode;
+        if (code == 13) {
+            //搜索
+            app.searchData('ruleForm');
+        }
+    }
+</script>
+
+</html>

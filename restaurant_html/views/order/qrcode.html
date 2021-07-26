@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+
+    <!-- <script src="../../static/js/vue.min.js"></script>
+    <script src="../../static/js/axios.min.js"></script>
+    <script src="../../static/eui/index.js"></script>
+    <link rel="stylesheet" href="../../static/eui/element-ui.css">
+    <link rel="stylesheet" href="../../static/css/index.css">
+    <script src="../../static/js/App.js"></script>
+    <script src="../../static/js/auth.js"></script>
+    <script src="../../static/js/checkIsLogin.js"></script>
+    <script src="../../static/js/RefreshComponent.js"></script> -->
+    <script src="../../static/qrcode/qrcode.min.js"></script>
+
+</head>
+
+<body>
+    <div id="app">
+        <div class="order-container">
+            <div style="display: inline-block; width: 30%">
+                <div id="qrcode1"></div>
+                <div style="display: flex; justify-content: center; align-items: center; width: 60%; color: #409EFF;"><h1>一号桌</h1></div>
+            </div>
+
+            <!-- <div style="display: inline-block; width: 30%">
+                <div id="qrcode2"></div>
+                <div style="display: flex; justify-content: center; align-items: center; width: 60%; color: #409EFF;"><h1>二号桌</h1></div>
+            </div> -->
+        </div>
+</body>
+
+<script type="text/javascript">
+    new QRCode(document.getElementById("qrcode1"), "http://4339e564.nat1.nsloop.com/customer/menu.html?tableNo=%e4%b8%80%e5%8f%b7%e6%a1%8c"); 
+    // new QRCode(document.getElementById("qrcode2"), "http://4339e564.nat1.nsloop.com/customer/menu.html?tableNo=%e4%ba%8c%e5%8f%b7%e6%a1%8c"); 
+</script>
+
+</html>
+<style>
+    .order-container{
+        text-align: center;
+    }
+</style>

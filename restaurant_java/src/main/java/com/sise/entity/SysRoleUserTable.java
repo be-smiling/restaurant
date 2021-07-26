@@ -1,0 +1,56 @@
+package com.sise.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.extension.activerecord.Model;
+
+import java.io.Serializable;
+
+/**
+ * (SysRoleUserTable)表实体类
+ */
+@SuppressWarnings("serial")
+public class SysRoleUserTable extends Model<SysRoleUserTable> {
+
+    @TableId(type = IdType.AUTO)
+    private int id;
+
+    private String roleId;
+    
+    private String userId;
+
+
+    public String getRoleId() {
+        return roleId;
+    }
+
+    public void setRoleId(String roleId) {
+        this.roleId = roleId;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    /**
+     * 获取主键值
+     *
+     * @return 主键值
+     */
+    @Override
+    protected Serializable pkVal() {
+        return this.roleId;
+    }
+    }

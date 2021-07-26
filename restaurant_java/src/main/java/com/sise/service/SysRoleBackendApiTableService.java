@@ -1,0 +1,20 @@
+package com.sise.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.sise.entity.SysRoleBackendApiTable;
+import com.sise.vo.SysRoleAndPermissionVo;
+
+/**
+ * (SysRoleBackendApiTable)表服务接口
+ */
+public interface SysRoleBackendApiTableService extends IService<SysRoleBackendApiTable> {
+
+    /**
+     * 批量保存角色-API表
+     * 该方法内有两个操作，先删除、后批量新增，因此存在事务控制
+     * @param roleId
+     * @param sysRoleAndPermissionVos
+     * @return
+     */
+    boolean saveRoleAip(String roleId, SysRoleAndPermissionVo... sysRoleAndPermissionVos);
+}

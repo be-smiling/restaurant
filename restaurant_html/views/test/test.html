@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <title>测试我的新组件</title>
+    <meta charset="UTF-8">
+
+    <!-- <link rel="stylesheet" href="../static/css/index.css"> -->
+    <!-- <link rel="stylesheet" href="../static/eui/element-ui.css"> -->
+
+    <!-- <link rel="stylesheet" href="../static/css/template.css"> -->
+    <script src="../../static/js/vue.min.js"></script>
+    <script src="../../static/js/axios.min.js"></script>
+    <!-- <script src="../static/eui/index.js"></script> -->
+
+    <!--    <script src="../static/js/App.js"></script>-->
+    <!--    <script src="../static/js/auth.js"></script>-->
+    <!--    <script src="../static/js/checkIsLogin.js"></script>-->
+    <!--    <script src="../static/js/RefreshComponent.js"></script>-->
+    <!-- <script src="../static/js/FormComm.js"></script> -->
+    <script src="../../static/echarts/echarts.min.js"></script>
+
+</head>
+
+<body>
+    <div id="app">
+        <div class="home-container">
+            <div id="main" style="width: 900px;height:400px;"></div>
+        </div>
+    </div>
+    <script>
+        let vue = new Vue({
+            el: "#app",
+            data: {
+                boxTitle: "新增商品",
+                url: 'http://localhost:8088/product',
+                model: {
+                    productId: null,
+                    productName: null,
+                    num: 0,
+                    price: 0.00
+                }
+            },
+            created() {
+                this.getProductById();
+            },
+            mounted() {
+                this.draw()
+            },
+            methods: {
+
+                draw() {
+                    // 基于准备好的dom，初始化echarts实例
+                    var myChart = echarts.init(document.getElementById('main'));
+
+                    // 指定图表的配置项和数据
+                    var option = {
+                        title: {
+                            text: '餐饮连锁店营业额(亿元)',
+                            padding: [20, 10, 10, 40]
+                        },
+                        tooltip: {},
+                        // legend: {
+                        //     data: ['营业额(亿元)']
+                        // },
+                        xAxis: {
+                            data: ["2010年", "2011年", "2012年", "2013年", "2014年", "2015年", "2016年", "2017年", "2018年", "2019年"],
+                            axisLabel: {
+                                inside: false,
+                                textStyle: {
+                                    color: '#000',
+                                    fontSize: '16',
+                                    itemSize: ''
+
+                                }
+                            }
+                        },
+                        yAxis: {
+                            axisLabel: {
+                                inside: false,
+                                textStyle: {
+                                    color: '#000',
+                                    fontSize: '16',
+                                    itemSize: ''
+
+                                }
+                            }
+                        },
+                        series: [{
+                            name: '营业额(亿元)',
+                            type: 'bar',
+                            data: [955.42, 1120.39, 1283.26, 1319.62, 1391.02, 1526.61, 2234.50, 1735.48, 1950.01, 2234.50],
+                            itemStyle: {
+                                normal: {
+                                    label: {
+                                        show: true, //开启显示
+                                        position: 'top', //在上方显示
+                                        textStyle: { //数值样式
+                                            color: 'black',
+                                            fontSize: 16
+                                        }
+                                    },
+                                    color: "rgba(171,220,251)"
+                                }
+                            }
+                        }]
+                    };
+                    // 使用刚指定的配置项和数据显示图表。
+                    myChart.setOption(option);
+                },
+
+                onValidate(model) {
+                    if (model.productName == null) {
+                        alert("请输入商品名称！");
+                        return false;
+                    } else {
+                        return true;
+                    }
+                },
+
+                newForm() {
+                    this.model = {};
+                    this.boxTitle = "新增商品";
+                    this.$refs.myForm.showForm();
+                },
+
+                /**
+                 * 模拟数据
+                 */
+                getProductById() {
+                    this.model = {
+                        productId: 5,
+                        productName: "火龙果",
+                        num: 5,
+                        price: 12.8
+                    }
+                    this.boxTitle = `编辑商品(${this.model.productName})`;
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+
+
+    <script src="../../static/js/vue.min.js"></script>
+    <script src="../../static/js/axios.min.js"></script>
+    <script src="../../static/eui/index.js"></script>
+    <link rel="stylesheet" href="../../static/eui/element-ui.css">
+    <link rel="stylesheet" href="../../static/css/index.css">
+    <script src="../../static/js/App.js"></script>
+    <script src="../../static/js/auth.js"></script>
+    <script src="../../static/js/checkIsLogin.js"></script>
+    <script src="../../static/js/RefreshComponent.js"></script>
+    <!-- <script src="../../static/echarts/echarts.min.js"></script> -->
+    <script src="https://cdn.staticfile.org/echarts/4.3.0/echarts.min.js"></script>
+
+    <style scoped lang="less">
+        .radio-label {
+            font-size: 14px;
+            color: #606266;
+        }
+
+        .search-input {
+            width: 245px;
+            display: inline-block;
+        }
+
+        .search-btn {
+            margin-left: 29px;
+        }
+
+        .filter-card {
+            margin-bottom: 10px;
+        }
+
+        .list-table {
+            margin-bottom: 20px;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div id="app">
+        <div class="restaurant-container">
+            <el-card class="filter-card">
+                <el-form size="mini" :inline="true" :model="searchMap" class="demo-form-inline">
+                    <el-form-item label="分店名称">
+                        <el-input v-model="searchMap.name" placeholder="分店名称"></el-input>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" @click="searchWithPage()">查询</el-button>
+                        <el-button type="primary" @click="dialogFormVisible=true">新增</el-button>
+                    </el-form-item>
+                </el-form>
+            </el-card>
+            <el-card class="box-card filter-card">
+                <!-- 数据列表开始 -->
+                <el-table :data="restaurantList" stripe style="width: 100%" class="list-table" size="mini" v-loading="loading">
+                    <!-- <el-table stripe style="width: 100%" class="list-table" size="mini" v-loading="loading"> -->
+                    <el-table-column prop="name" label="分店名称"></el-table-column>
+                    <el-table-column prop="manager" label="店长"></el-table-column>
+                    <el-table-column prop="phone" label="分店电话"></el-table-column>
+                    <el-table-column prop="address" label="分店地址" width="180px"></el-table-column>
+                    <el-table-column prop="startTime" label="开店时间"></el-table-column>
+                    <el-table-column prop="cost" label="总成本">
+                        <template slot-scope="scope">
+                            {{scope.row.cost}}万元
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="turnover" label="总营业额">
+                        <template slot-scope="scope">
+                            {{scope.row.turnover}}万元
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="stay" label="操作">
+                        <template slot-scope="scope">
+                            <el-button size="mini" circle icon="el-icon-edit" type="primary" @click="findById(scope.row.id)"></el-button>
+                            <el-button size="mini" type="danger" icon="el-icon-delete" circle @click="deleteById(scope.row.id)"></el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+                <!-- 数据列表结束 -->
+
+                <!-- 列表分页开始 -->
+                <el-pagination layout="total, sizes, prev, pager, next, jumper" background :total="total" :page-size="pageSize" :disabled="loading"
+                    :current-page.sync="currentPage" :page-sizes="[5, 10]" @current-change="onCurrentChange" @size-change="handleSizeChange"
+                />
+                <!-- 列表分页结束 -->
+
+
+            </el-card>
+
+            <!-- 图表统计卡片 -->
+            <el-card>
+                <div style="display: flex; align-items: center; justify-content: center">
+                <div id="main" style="width: 800px;height:500px;"></div>
+            </div>
+            </el-card>
+            <!-- 分店弹出框开始 -->
+            <el-dialog title="编辑分店" :visible.sync="dialogFormVisible" :append-to-body="true">
+                <el-form size="mini" ref="dialog-form" :model="restaurant" :rules="restaurantRules" label-width="80px">
+                    <el-form-item label="分店名称" prop="name">
+                        <el-input v-model="restaurant.name"></el-input>
+                    </el-form-item>
+                    <el-form-item label="分店店长" prop="manager">
+                        <el-input v-model="restaurant.manager"></el-input>
+                    </el-form-item>
+                    <el-form-item label="分店电话" prop="phone">
+                        <el-input v-model="restaurant.phone"></el-input>
+                    </el-form-item>
+                    <el-form-item label="分店地址" prop="address">
+                        <el-input v-model="restaurant.address"></el-input>
+                    </el-form-item>
+                    <el-form-item label="开店时间" prop="start_time">
+                        <el-input v-model="restaurant.startTime" placeholder="请输入日期"></el-input>
+                    </el-form-item>
+                </el-form>
+                <div slot="footer" class="dialog-footer">
+                    <el-button size="mini" @click="dialogFormVisible = false">取 消</el-button>
+                    <el-button size="mini" type="primary" @click="saveOrUpdate">确 定</el-button>
+                </div>
+            </el-dialog>
+            <!-- 分店弹出框结束 -->
+        </div>
+</body>
+
+<script>
+
+    var Main = {
+        data() {
+            return {
+                total: 0,
+                pageSize: 10,
+                currentPage: 1,
+                loading: true,
+                searchMap: {},
+                dialogFormVisible: false,
+                restaurantList: [],
+                id: null,
+                restaurant: {},
+                restaurantRules: {},
+                searchCondition: true
+            }
+        },
+
+        created: function () {
+            this.search()
+
+        },
+        mounted() {
+            this.draw()
+        },
+
+        methods: {
+            // echarts画图
+            draw() {
+                // 基于准备好的dom，初始化echarts实例
+                var myChart = echarts.init(document.getElementById('main'));
+
+                // 指定图表的配置项和数据
+                option = {
+                    title: {
+                        text: '分店成本-营业额图（单位：万元）'
+                    },
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            type: 'shadow'
+                        }
+                    },
+                    legend: {
+                        data: ['总成本', '总营业额'],
+                        textStyle: {
+                            fontSize: 16
+                        }
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '3%',
+                        containLabel: true
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: ['太平镇广软分店', '从化街口分店', '天河智慧城分店', '番禺广场分店', '科学城分店']
+                    },
+                    yAxis: {
+                        type: 'value',
+                        boundaryGap: [0, 0.01]
+                    },
+                    series: [
+                        {
+                            name: '总成本',
+                            type: 'bar',
+                            data: [500, 600, 700, 800, 900],
+                            itemStyle: {
+                                normal: {
+                                    label: {
+                                        show: true, //开启显示
+                                        position: 'top', //在上方显示
+                                        textStyle: { //数值样式
+                                            color: 'black',
+                                            fontSize: 16
+                                        }
+                                    },
+                                    color: "rgba(116,142,222)"
+                                }
+                            }
+                        },
+                        {
+                            name: '总营业额',
+                            type: 'bar',
+                            data: [550, 650, 750, 850, 950],
+                            itemStyle: {
+                                normal: {
+                                    label: {
+                                        show: true, //开启显示
+                                        position: 'top', //在上方显示
+                                        textStyle: { //数值样式
+                                            color: 'black',
+                                            fontSize: 16
+                                        }
+                                    },
+                                    color: "rgba(169, 223, 150)"
+                                }
+                            }
+                        }
+                    ]
+                };
+
+                // 使用刚指定的配置项和数据显示图表。
+                myChart.setOption(option);
+            },
+            // 删除分店
+            deleteById(restaurantId) {
+                this.$confirm('确认删除吗？', '删除提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+
+                    axios.delete(global_api_url + `restaurant/${restaurantId}`).then(res => {
+                        if (res.data.code == 0) {
+                            this.$message.success(res.data.msg)
+                            this.search()
+                        } else {
+                            this.$message.error("错误消息：" + res.data.msg)
+                        }
+                    }).catch(e => {
+                        alert(e)
+                    })
+                }).catch(() => {
+                    this.$message({
+                        type: 'info',
+                        message: '已取消删除'
+                    })
+                })
+            },
+
+            // 保存分店
+            save(restaurant) {
+                axios.post(global_api_url + 'restaurant/save', restaurant).then(res => {
+                    if (res.data.code == 0) {
+                        this.dialogFormVisible = false
+                        this.search()
+                        this.restaurant = {}
+                        this.id = null
+                    } else {
+                        this.$message.error("错误消息：" + res.data.msg)
+                        this.dialogFormVisible = false
+                        this.id = null
+                    }
+                })
+            },
+            // 更新分店信息
+            update(id, restaurant) {
+                axios.put(global_api_url + `restaurant/update/${id}`, restaurant).then(res => {
+                    if (res.data.code == 0) {
+                        this.dialogFormVisible = false
+                        this.search()
+                        this.restaurant = {}
+                        this.id = null
+                    } else {
+                        this.$message.error("错误消息：" + res.data.msg)
+                        this.dialogFormVisible = false
+                    }
+                }).catch(e => {
+                    alert(e)
+                })
+            },
+
+            // 保存分店
+            saveOrUpdate: function () {
+
+                if (this.id === undefined || this.id === null || this.id === '') {
+                    this.save(this.restaurant)
+                } else {
+                    this.update(this.id, this.restaurant)
+                }
+            },
+
+            // 根据id查询分店
+            findById(id) {
+
+                axios.get(global_api_url + `restaurant/findById/${id}`).then(res => {
+                    if (res.data.code == 0) {
+                        console.log(res.data.data)
+                        this.restaurant = res.data.data
+                        this.dialogFormVisible = true
+                        this.id = id
+                    } else {
+                        this.$message.error("错误消息：" + res.data.msg)
+                    }
+                }).catch(e => {
+                    alert(e)
+                })
+            },
+
+            // 每页显示条数改变时重新加载分店列表
+            handleSizeChange(val) {
+                this.pageSize = val
+                this.currentPage = 1
+                this.search()
+            },
+
+            // 当前页改变时重新加载分店列表
+            onCurrentChange() {
+                this.search()
+            },
+
+            // 查询带分页且带条件时，从第一页开始查
+            searchWithPage: function () {
+                if (this.searchMap.name === '') {
+                    this.currentPage = 1
+                }
+                if ((JSON.stringify(this.searchMap) !== '{}') && (this.searchCondition)) {
+                    this.currentPage = 1
+                    // this.searchCondition = false
+                }
+
+                axios.post(global_api_url + `restaurant/findByPage/${this.currentPage}/${this.pageSize}`, this.searchMap).then(res => {
+                    if (res.data.code == 0) {
+                        this.restaurantList = res.data.data.rows
+                        this.total = res.data.data.total
+                        this.loading = false
+                    } else {
+                        this.$message.success(res.data.msg)
+                    }
+                }).catch(e => {
+                    alert(e)
+                })
+            },
+
+            // 查询分店列表
+            search: function () {
+
+                axios.post(global_api_url + `restaurant/findByPage/${this.currentPage}/${this.pageSize}`, this.searchMap).then(res => {
+                    if (res.data.code == 0) {
+                        this.restaurantList = res.data.data.rows
+                        this.total = res.data.data.total
+                        this.loading = false
+                    } else {
+                        this.$alert(res.data.msg, '提示', {
+                            confirmButtonText: '确定',
+                            type: 'wrong',
+                            callback: action => {
+                                parent.app.removeTab("viewsrestaurantindex.html_分店管理")
+                            }
+                        });
+                    }
+                }).catch(e => {
+                    alert(e)
+                })
+            }
+        }
+    }
+    let Ctor = Vue.extend(Main);
+    let app = new Ctor().$mount('#app');
+</script>
+
+</html>
